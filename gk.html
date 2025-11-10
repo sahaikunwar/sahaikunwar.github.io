@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>GK - Sahai Academy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="nav">
+      <a href="index.html" class="nav-home">Sahai Academy</a>
+      <div class="nav-links">
+        <a href="gk.html">GK</a>
+        <a href="maths-science.html">Maths &amp; Science</a>
+        <a href="kids.html">Kids</a>
+        <a href="health-medicines.html">Health &amp; Medicines</a>
+      </div>
+    </div>
+    <h1>GK</h1>
+    <p>General knowledge videos across a variety of topics.</p>
+  </header>
+
+  <section class="controls">
+    <input type="text" id="searchInput" placeholder="Search within this category…" />
+    <select id="topicFilter">
+      <option value="">All topics</option>
+    </select>
+  </section>
+
+  <main>
+    <div id="videoList" class="video-grid">
+      <!-- Cards added by app.js -->
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>© Kunwar Sahai | Sahai Academy. Videos are embedded or linked from original platforms (YouTube, Facebook, Instagram, etc.).</p>
+  </footer>
+
+  <script>
+    const CATEGORY_FILTER = "GK";
+  </script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
