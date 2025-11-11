@@ -1,5 +1,7 @@
 let allVideos = [];
 
+
+// Decide how to embed based on URL
 function createEmbedElement(video) {
   const url = (video.url || '').trim();
   if (!url) return null;
@@ -17,7 +19,7 @@ function createEmbedElement(video) {
     'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
   );
 
-  // ✅ YouTube – embed inline
+  // YouTube
   if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
     const match = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
     if (match) {
@@ -27,7 +29,18 @@ function createEmbedElement(video) {
     }
   }
 
-  // ✅ Instagram – embed inline
+  // Facebook video plugin
+  if (lower.includes('facebook.com')) {
+    const pluginSrc =
+      'https://www.facebook.com/plugins/video.php?href=' +
+      encodeURIComponent(url) +
+      '&show_text=0&width=560';
+    iframe.src = pluginSrc;
+    iframe.height = '320';
+    return iframe;
+  }
+
+  // Instagram embed
   if (lower.includes('instagram.com') || lower.includes('instagr.am')) {
     let embedUrl = url;
     if (!embedUrl.endsWith('/')) embedUrl += '/';
@@ -39,10 +52,9 @@ function createEmbedElement(video) {
     return iframe;
   }
 
-  // ❌ Facebook & others – DO NOT embed
-  // Many Facebook "share" links cannot be embedded and show "Video unavailable".
-  // For these, we rely only on the "Open video in new tab" button.
-  return null;
+  // Default: try to iframe the URL (may or may not be allowed by the site)
+  iframe.src = url;
+  return iframe;
 }
 
 async function loadVideos() {
