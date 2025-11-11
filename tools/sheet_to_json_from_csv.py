@@ -2,7 +2,8 @@
 
 Usage:
 
-1. Create a Google Sheet with columns: title,topic,category,platform,url
+1. Create a Google Sheet with columns: title,topic,category,platform,url,thumbnail
+   - `thumbnail` is optional. If present, it should be a direct image URL or a path to an image in your repo.
 2. In Google Sheets: File -> Download -> Comma-separated values (.csv)
 3. Save that file as tools/videos.csv (in this project)
 4. Run this script from the project root:
@@ -30,7 +31,7 @@ def csv_to_json():
     videos = []
     with CSV_PATH.open(newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
-        # Expecting headers: title, topic, category, platform, url
+        # Expecting headers: title, topic, category, platform, url, thumbnail (thumbnail optional)
         for row in reader:
             title = (row.get("title") or "").strip()
             url = (row.get("url") or "").strip()
@@ -43,6 +44,7 @@ def csv_to_json():
                 "category": (row.get("category") or "").strip(),
                 "platform": (row.get("platform") or "").strip() or "Unknown",
                 "url": url,
+                "thumbnail": (row.get("thumbnail") or "").strip(),
             })
 
     JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
