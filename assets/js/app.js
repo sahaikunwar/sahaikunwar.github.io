@@ -1,6 +1,15 @@
+/*******************************
+ * D4E – Sheet-backed video loader
+ * REPLACE the whole app.js with this file.
+ *******************************/
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwfpTrrhB5nRbPNvjQqLTAwawyEnieaDJ0VqAjSrMDmOox0JPP_Yuu0QKfej1QqcJE/exec";
+// ↑ Use your own /exec URL
+
 let allVideos = [];
 
-// Helper: get a nice thumbnail URL if possible
+/* ---------- Helpers ---------- */
+
+// Build a nice thumbnail if not provided
 function getThumbnailUrl(video) {
   const url = (video.url || '').trim();
   if (!url) return null;
@@ -44,7 +53,7 @@ function createEmbedElement(video) {
     }
   }
 
-  // Instagram embed
+  // Instagram embed (may fail on some pages due to CORS/policy—fallback is thumbnail link)
   if (lower.includes('instagram.com') || lower.includes('instagr.am')) {
     let embedUrl = url;
     if (!embedUrl.endsWith('/')) embedUrl += '/';
@@ -57,28 +66,95 @@ function createEmbedElement(video) {
     return iframe;
   }
 
-  // Facebook and other platforms: do not embed to avoid "Video unavailable".
+  // Facebook and other platforms: do not iframe (thumbnail/link instead)
   return null;
 }
 
-async function loadVideos() {
-  try {
-    const res = await fetch('data/videos.json');
-    allVideos = await res.json();
-    const category = typeof CATEGORY_FILTER !== 'undefined' ? CATEGORY_FILTER : null;
-    const vids = category ? allVideos.filter(v => (v.category || '').toLowerCase() === category.toLowerCase()) : allVideos;
-    renderTopics(vids);
-    renderVideos(vids);
-  } catch (e) {
-    const c = document.getElementById('videoList');
-    if (c) c.textContent = 'Could not load videos.';
-  }
+/* ---------- NEW: Load from Google Sheet Web App ---------- */
+
+async function fetchSectionFromSheet(sectionName) {
+  const url = `${WEB_APP_URL}?section=${encodeURIComponent(sectionName)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Sheet API HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data || !Array.isArray(data.items)) throw new Error('Invalid sheet JSON');
+
+  // Map sheet columns → your existing front-end structure
+  // Sheet fields: Section, Platform, SourceURL, EmbedType, VideoID, Title, Description,
+  // ThumbnailURL, Duration, Language, Publish, SortOrder, StartDate, EndDate, Tags
+  const mapped = data.items
+    .sort((a, b) => Number(a.SortOrder || 999999) - Number(b.SortOrder || 999999))
+    .map(item => {
+      // Choose a primary topic from Tags (first tag) for your filter dropdown
+      const firstTag = (item.Tags || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)[0] || '';
+
+      // Prefer explicit thumbnail; else auto-generate for YouTube if VideoID present
+      const explicitThumb = (item.ThumbnailURL || '').trim();
+      const autoYouTubeThumb = (item.Platform === 'YouTube' && item.VideoID)
+        ? `https://img.youtube.com/vi/${item.VideoID}/hqdefault.jpg`
+        : '';
+
+      return {
+        title: item.Title || '',
+        url: item.SourceURL || '',
+        platform: item.Platform || '',
+        topic: firstTag,                    // used by your topic filter
+        category: item.Section || sectionName, // page-level section
+        thumbnail: explicitThumb || autoYouTubeThumb
+      };
+    });
+
+  return mapped;
 }
+
+/* ---------- Legacy JSON fallback (kept, just in case) ---------- */
+async function fetchFromLocalJSON(category) {
+  const res = await fetch('data/videos.json');
+  const raw = await res.json();
+  return category
+    ? raw.filter(v => (v.category || '').toLowerCase() === category.toLowerCase())
+    : raw;
+}
+
+/* ---------- Entry point ---------- */
+
+async function loadVideos() {
+  const container = document.getElementById('videoList');
+  const category = (typeof CATEGORY_FILTER !== 'undefined' && CATEGORY_FILTER) ? CATEGORY_FILTER : null;
+
+  try {
+    if (!WEB_APP_URL) throw new Error('WEB_APP_URL missing');
+    if (!category) throw new Error('CATEGORY_FILTER missing on page');
+
+    // Primary path: Sheet → JSON
+    allVideos = await fetchSectionFromSheet(category);
+  } catch (e) {
+    console.warn('Sheet fetch failed, falling back to local JSON:', e.message);
+    // Fallback to local JSON file if present
+    try {
+      allVideos = await fetchFromLocalJSON(category);
+    } catch (err) {
+      console.error('Local JSON fetch failed:', err);
+      if (container) container.textContent = 'Could not load videos.';
+      return;
+    }
+  }
+
+  renderTopics(allVideos);
+  renderVideos(allVideos);
+}
+
+/* ---------- Rendering & filters (unchanged) ---------- */
 
 function renderTopics(videos) {
   const topicFilter = document.getElementById('topicFilter');
   if (!topicFilter) return;
-  const topics = Array.from(new Set(videos.map(v=>v.topic).filter(Boolean))).sort();
+  // Reset (avoid duplicate options on re-render)
+  topicFilter.innerHTML = `<option value="">All topics</option>`;
+  const topics = Array.from(new Set(videos.map(v => v.topic).filter(Boolean))).sort();
   topics.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t; opt.textContent = t;
@@ -118,7 +194,7 @@ function renderVideos(videos) {
       wrap.className = 'video-thumb';
       const a = document.createElement('a');
       a.href = video.url; a.target = '_blank'; a.rel='noopener noreferrer';
-      const thumb = getThumbnailUrl(video);
+      const thumb = getThumbnailUrl(video) || video.thumbnail;
       if (thumb) {
         const img = document.createElement('img');
         img.src = thumb; img.alt = video.title;
